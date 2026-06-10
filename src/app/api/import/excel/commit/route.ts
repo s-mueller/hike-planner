@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     try {
-      await prisma.$transaction(async (tx: typeof prisma) => {
+      await prisma.$transaction(async (tx) => {
         const hike = await tx.hike.create({
           data: {
             name: row.name,
