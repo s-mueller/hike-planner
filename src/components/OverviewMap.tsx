@@ -86,8 +86,10 @@ export default function OverviewMap({ routes, onBoundsChange, onWeatherData, fil
   const routeLayersRef = useRef<Map<string, L.GeoJSON>>(new Map());
   const onBoundsChangeRef = useRef(onBoundsChange);
   const onWeatherDataRef = useRef(onWeatherData);
+  const filteredIdsRef = useRef(filteredIds);
   onBoundsChangeRef.current = onBoundsChange;
   onWeatherDataRef.current = onWeatherData;
+  filteredIdsRef.current = filteredIds;
 
   const [showWeather, setShowWeather] = useState(false);
   const [dayOffset, setDayOffset] = useState(0);
@@ -153,6 +155,14 @@ export default function OverviewMap({ routes, onBoundsChange, onWeatherData, fil
 
     if (allBounds.isValid()) map.fitBounds(allBounds, { padding: [30, 30] });
 
+    // Apply any filter that was already active before the map (re-)initialised
+    const currentFilter = filteredIdsRef.current;
+    if (currentFilter) {
+      routeLayersRef.current.forEach((layer, id) => {
+        if (!currentFilter.has(id)) layer.remove();
+      });
+    }
+
     map.whenReady(() => emitBounds(map));
     map.on("moveend", () => emitBounds(map));
 
@@ -164,14 +174,14 @@ export default function OverviewMap({ routes, onBoundsChange, onWeatherData, fil
     };
   }, [routes, emitBounds]);
 
-  // Show/hide route lines when filteredIds changes — no map re-init needed
+  // Show/hide route lines when filteredIds changes
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
     routeLayersRef.current.forEach((layer, id) => {
       const visible = !filteredIds || filteredIds.has(id);
-      if (visible && !map.hasLayer(layer)) map.addLayer(layer);
-      if (!visible && map.hasLayer(layer)) map.removeLayer(layer);
+      if (visible) layer.addTo(map);
+      else layer.remove();
     });
   }, [filteredIds]);
 
@@ -225,7 +235,7 @@ export default function OverviewMap({ routes, onBoundsChange, onWeatherData, fil
     return () => controller.abort();
   }, [showWeather, dayOffset, routes]);
 
-  // Weather marker rendering — re-runs whenever data or visibility changes
+  // Weather marker rendering — re-runs whenever data, visibility, or filter changes
   useEffect(() => {
     if (weatherLayerRef.current) {
       weatherLayerRef.current.remove();
@@ -240,6 +250,7 @@ export default function OverviewMap({ routes, onBoundsChange, onWeatherData, fil
 
     routes.forEach((route) => {
       if (!route.center) return;
+      if (filteredIds && !filteredIds.has(route.id)) return;
       const info = weatherData.get(route.id);
       if (!info) return;
       const [lat, lng] = route.center;
@@ -253,7 +264,7 @@ export default function OverviewMap({ routes, onBoundsChange, onWeatherData, fil
         )
         .addTo(layer);
     });
-  }, [showWeather, weatherData, routes]);
+  }, [showWeather, weatherData, routes, filteredIds]);
 
   if (routes.length === 0) return null;
 
