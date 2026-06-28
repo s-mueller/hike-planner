@@ -253,8 +253,8 @@ export default function HikeDetailPage({
                 center={hike.gpxFile.routeCenter ?? undefined}
               />
             )}
-            <div className="flex items-center justify-between text-sm text-gray-600">
-              <span>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-600">
+              <span className="min-w-0 break-all">
                 {hike.gpxFile.originalFilename} ({Math.round(hike.gpxFile.fileSizeBytes / 1024)} KB)
                 {hike.gpxFile.routeDistanceM != null && (
                   <> — {(hike.gpxFile.routeDistanceM / 1000).toFixed(1)} km</>
@@ -266,7 +266,7 @@ export default function HikeDetailPage({
                   await fetch(`/api/hikes/${hike.id}/gpx`, { method: "DELETE" });
                   reload();
                 }}
-                className="text-red-600 hover:underline"
+                className="shrink-0 text-red-600 hover:underline"
               >
                 Löschen
               </button>

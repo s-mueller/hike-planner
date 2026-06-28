@@ -20,6 +20,9 @@ export async function GET(request: Request) {
   const status = searchParams.get("status");
   const difficulty = searchParams.get("difficulty");
   const activityType = searchParams.get("activityType");
+  const region = searchParams.get("region");
+  const season = searchParams.get("season");
+  const sort = searchParams.get("sort") ?? "newest";
   const search = searchParams.get("q");
 
   const where: Record<string, unknown> = {};
@@ -27,6 +30,8 @@ export async function GET(request: Request) {
   if (status) where.status = status;
   if (difficulty) where.difficultyRaw = difficulty;
   if (activityType) where.activityType = activityType;
+  if (region) where.region = region;
+  if (season) where.season = season;
   if (search) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
@@ -36,10 +41,20 @@ export async function GET(request: Request) {
     ];
   }
 
+  const orderBy: Record<string, string> =
+    sort === "oldest" ? { createdAt: "asc" }
+    : sort === "name_asc" ? { name: "asc" }
+    : sort === "name_desc" ? { name: "desc" }
+    : sort === "distance_asc" ? { distanceKm: "asc" }
+    : sort === "distance_desc" ? { distanceKm: "desc" }
+    : sort === "ascent_asc" ? { ascentM: "asc" }
+    : sort === "ascent_desc" ? { ascentM: "desc" }
+    : { createdAt: "desc" };
+
   const hikes = await prisma.hike.findMany({
     where,
     include: { links: true },
-    orderBy: { createdAt: "desc" },
+    orderBy,
   });
 
   return NextResponse.json(hikes);

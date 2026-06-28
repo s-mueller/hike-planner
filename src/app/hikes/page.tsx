@@ -40,6 +40,7 @@ interface Options {
   regions: string[];
   activityTypes: string[];
   difficulties: string[];
+  seasons: string[];
 }
 
 interface GpxRoute {
@@ -59,12 +60,15 @@ export default function HikesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gpxRoutes, setGpxRoutes] = useState<GpxRoute[]>([]);
-  const [options, setOptions] = useState<Options>({ regions: [], activityTypes: [], difficulties: [] });
+  const [options, setOptions] = useState<Options>({ regions: [], activityTypes: [], difficulties: [], seasons: [] });
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [difficulty, setDifficulty] = useState("");
   const [activityType, setActivityType] = useState("");
+  const [region, setRegion] = useState("");
+  const [season, setSeason] = useState("");
+  const [sort, setSort] = useState("newest");
   const [gpxFilter, setGpxFilter] = useState("");
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
 
@@ -77,6 +81,9 @@ export default function HikesPage() {
     if (status) params.set("status", status);
     if (difficulty) params.set("difficulty", difficulty);
     if (activityType) params.set("activityType", activityType);
+    if (region) params.set("region", region);
+    if (season) params.set("season", season);
+    if (sort !== "newest") params.set("sort", sort);
 
     try {
       const res = await fetch(`/api/hikes?${params.toString()}`);
@@ -88,7 +95,7 @@ export default function HikesPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, status, difficulty, activityType]);
+  }, [search, status, difficulty, activityType, region, season, sort]);
 
   useEffect(() => {
     const timeout = setTimeout(fetchHikes, 300);
@@ -171,13 +178,13 @@ export default function HikesPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         <input
           type="search"
           placeholder="Suchen..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="rounded border px-3 py-1.5 text-sm"
+          className="col-span-2 rounded border px-3 py-1.5 text-sm sm:min-w-[10rem] sm:flex-1"
         />
         <select
           value={status}
@@ -195,9 +202,7 @@ export default function HikesPage() {
         >
           <option value="">Alle Schwierigkeiten</option>
           {options.difficulties.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
+            <option key={d} value={d}>{d}</option>
           ))}
         </select>
         <select
@@ -207,11 +212,33 @@ export default function HikesPage() {
         >
           <option value="">Alle Sportarten</option>
           {options.activityTypes.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
+            <option key={a} value={a}>{a}</option>
           ))}
         </select>
+        {options.regions.length > 0 && (
+          <select
+            value={region}
+            onChange={(e) => setRegion(e.target.value)}
+            className="rounded border px-3 py-1.5 text-sm"
+          >
+            <option value="">Alle Regionen</option>
+            {options.regions.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        )}
+        {options.seasons.length > 0 && (
+          <select
+            value={season}
+            onChange={(e) => setSeason(e.target.value)}
+            className="rounded border px-3 py-1.5 text-sm"
+          >
+            <option value="">Alle Saisons</option>
+            {options.seasons.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        )}
         <select
           value={gpxFilter}
           onChange={(e) => setGpxFilter(e.target.value)}
@@ -221,16 +248,33 @@ export default function HikesPage() {
           <option value="with_gpx">Mit GPX</option>
           <option value="without_gpx">Ohne GPX</option>
         </select>
-        {(search || status || difficulty || activityType || gpxFilter) && (
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+          className="rounded border px-3 py-1.5 text-sm"
+        >
+          <option value="newest">Neueste zuerst</option>
+          <option value="oldest">Älteste zuerst</option>
+          <option value="name_asc">Name A–Z</option>
+          <option value="name_desc">Name Z–A</option>
+          <option value="distance_asc">Distanz ↑</option>
+          <option value="distance_desc">Distanz ↓</option>
+          <option value="ascent_asc">Aufstieg ↑</option>
+          <option value="ascent_desc">Aufstieg ↓</option>
+        </select>
+        {(search || status || difficulty || activityType || region || season || gpxFilter || sort !== "newest") && (
           <button
             onClick={() => {
               setSearch("");
               setStatus("");
               setDifficulty("");
               setActivityType("");
+              setRegion("");
+              setSeason("");
               setGpxFilter("");
+              setSort("newest");
             }}
-            className="rounded border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+            className="col-span-2 rounded border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 sm:col-span-1"
           >
             Filter zurücksetzen
           </button>

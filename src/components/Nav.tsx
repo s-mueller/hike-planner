@@ -12,11 +12,11 @@ export function Nav() {
   const pathname = usePathname();
 
   return (
-    <nav className="mb-6 flex items-center gap-6 border-b pb-4">
+    <nav className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-b pb-4">
       <Link href="/hikes" className="text-lg font-bold">
         🥾 Hike Planner
       </Link>
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-4">
         {links.map((link) => (
           <Link
             key={link.href}
