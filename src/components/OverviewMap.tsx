@@ -29,9 +29,12 @@ interface WeatherInfo {
   quality: "good" | "ok" | "bad";
 }
 
+export type WeatherQuality = "good" | "ok" | "bad";
+
 interface OverviewMapProps {
   routes: HikeRoute[];
   onBoundsChange?: (bounds: MapBounds) => void;
+  onWeatherData?: (data: Map<string, WeatherQuality>) => void;
 }
 
 const ROUTE_COLORS = [
@@ -75,12 +78,14 @@ function createWeatherIcon(info: WeatherInfo) {
   });
 }
 
-export default function OverviewMap({ routes, onBoundsChange }: OverviewMapProps) {
+export default function OverviewMap({ routes, onBoundsChange, onWeatherData }: OverviewMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const weatherLayerRef = useRef<L.LayerGroup | null>(null);
   const onBoundsChangeRef = useRef(onBoundsChange);
+  const onWeatherDataRef = useRef(onWeatherData);
   onBoundsChangeRef.current = onBoundsChange;
+  onWeatherDataRef.current = onWeatherData;
 
   const [showWeather, setShowWeather] = useState(false);
   const [dayOffset, setDayOffset] = useState(0);
@@ -157,6 +162,7 @@ export default function OverviewMap({ routes, onBoundsChange }: OverviewMapProps
   useEffect(() => {
     if (!showWeather) {
       setWeatherData(new Map());
+      onWeatherDataRef.current?.(new Map());
       return;
     }
 
@@ -194,6 +200,9 @@ export default function OverviewMap({ routes, onBoundsChange }: OverviewMapProps
       results.forEach((r) => { if (r) map.set(r.id, r.info); });
       setWeatherData(map);
       setWeatherLoading(false);
+      const qualityMap = new Map<string, WeatherQuality>();
+      map.forEach((info, id) => qualityMap.set(id, info.quality));
+      onWeatherDataRef.current?.(qualityMap);
     });
 
     return () => controller.abort();

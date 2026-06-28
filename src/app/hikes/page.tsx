@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import type { MapBounds } from "@/components/OverviewMap";
+import type { MapBounds, WeatherQuality } from "@/components/OverviewMap";
 
 const OverviewMap = dynamic(() => import("@/components/OverviewMap"), {
   ssr: false,
@@ -70,6 +70,8 @@ export default function HikesPage() {
   const [season, setSeason] = useState("");
   const [sort, setSort] = useState("newest");
   const [gpxFilter, setGpxFilter] = useState("");
+  const [weatherFilter, setWeatherFilter] = useState<"" | "good" | "good_ok">("");
+  const [weatherQualities, setWeatherQualities] = useState<Map<string, WeatherQuality>>(new Map());
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
 
   const fetchHikes = useCallback(async () => {
@@ -151,6 +153,16 @@ export default function HikesPage() {
       return result;
     }
 
+    if (weatherFilter && weatherQualities.size > 0) {
+      result = result.filter((h) => {
+        const q = weatherQualities.get(h.id);
+        if (!q) return false;
+        if (weatherFilter === "good") return q === "good";
+        if (weatherFilter === "good_ok") return q === "good" || q === "ok";
+        return true;
+      });
+    }
+
     if (!mapBounds) return result;
     return result.filter((hike) => {
       const center = gpxCenterMap.get(hike.id);
@@ -163,7 +175,7 @@ export default function HikesPage() {
         lng <= mapBounds.east
       );
     });
-  }, [hikes, mapBounds, gpxCenterMap, gpxFilter, gpxHikeIds]);
+  }, [hikes, mapBounds, gpxCenterMap, gpxFilter, gpxHikeIds, weatherFilter, weatherQualities]);
 
   return (
     <div className="space-y-6">
@@ -248,6 +260,17 @@ export default function HikesPage() {
           <option value="with_gpx">Mit GPX</option>
           <option value="without_gpx">Ohne GPX</option>
         </select>
+        {weatherQualities.size > 0 && (
+          <select
+            value={weatherFilter}
+            onChange={(e) => setWeatherFilter(e.target.value as "" | "good" | "good_ok")}
+            className="rounded border px-3 py-1.5 text-sm"
+          >
+            <option value="">Alle Wetter</option>
+            <option value="good">☀️ Nur gutes Wetter</option>
+            <option value="good_ok">🌤 Gut &amp; mässig</option>
+          </select>
+        )}
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value)}
@@ -262,7 +285,7 @@ export default function HikesPage() {
           <option value="ascent_asc">Aufstieg ↑</option>
           <option value="ascent_desc">Aufstieg ↓</option>
         </select>
-        {(search || status || difficulty || activityType || region || season || gpxFilter || sort !== "newest") && (
+        {(search || status || difficulty || activityType || region || season || gpxFilter || weatherFilter || sort !== "newest") && (
           <button
             onClick={() => {
               setSearch("");
@@ -272,6 +295,7 @@ export default function HikesPage() {
               setRegion("");
               setSeason("");
               setGpxFilter("");
+              setWeatherFilter("");
               setSort("newest");
             }}
             className="col-span-2 rounded border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 sm:col-span-1"
@@ -282,7 +306,16 @@ export default function HikesPage() {
       </div>
 
       {/* Overview Map */}
-      {gpxFilter !== "without_gpx" && filteredRoutes.length > 0 && <OverviewMap routes={filteredRoutes} onBoundsChange={setMapBounds} />}
+      {gpxFilter !== "without_gpx" && filteredRoutes.length > 0 && (
+        <OverviewMap
+          routes={filteredRoutes}
+          onBoundsChange={setMapBounds}
+          onWeatherData={(data) => {
+            setWeatherQualities(data);
+            if (data.size === 0) setWeatherFilter("");
+          }}
+        />
+      )}
 
       {/* Results */}
       {error && (
