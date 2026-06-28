@@ -35,6 +35,7 @@ interface OverviewMapProps {
   routes: HikeRoute[];
   onBoundsChange?: (bounds: MapBounds) => void;
   onWeatherData?: (data: Map<string, WeatherQuality>) => void;
+  filteredIds?: Set<string>;
 }
 
 const ROUTE_COLORS = [
@@ -78,10 +79,11 @@ function createWeatherIcon(info: WeatherInfo) {
   });
 }
 
-export default function OverviewMap({ routes, onBoundsChange, onWeatherData }: OverviewMapProps) {
+export default function OverviewMap({ routes, onBoundsChange, onWeatherData, filteredIds }: OverviewMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const weatherLayerRef = useRef<L.LayerGroup | null>(null);
+  const routeLayersRef = useRef<Map<string, L.GeoJSON>>(new Map());
   const onBoundsChangeRef = useRef(onBoundsChange);
   const onWeatherDataRef = useRef(onWeatherData);
   onBoundsChangeRef.current = onBoundsChange;
@@ -122,6 +124,7 @@ export default function OverviewMap({ routes, onBoundsChange, onWeatherData }: O
     }).addTo(map);
 
     const allBounds = L.latLngBounds([]);
+    routeLayersRef.current.clear();
 
     routes.forEach((route, idx) => {
       const color = ROUTE_COLORS[idx % ROUTE_COLORS.length];
@@ -129,6 +132,8 @@ export default function OverviewMap({ routes, onBoundsChange, onWeatherData }: O
       const layer = L.geoJSON(route.geojson, {
         style: { color, weight: 3, opacity: 0.8 },
       }).addTo(map);
+
+      routeLayersRef.current.set(route.id, layer);
 
       const popupContent = `
         <div style="min-width:150px">
@@ -155,8 +160,20 @@ export default function OverviewMap({ routes, onBoundsChange, onWeatherData }: O
       map.remove();
       mapInstanceRef.current = null;
       weatherLayerRef.current = null;
+      routeLayersRef.current.clear();
     };
   }, [routes, emitBounds]);
+
+  // Show/hide route lines when filteredIds changes — no map re-init needed
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    routeLayersRef.current.forEach((layer, id) => {
+      const visible = !filteredIds || filteredIds.has(id);
+      if (visible && !map.hasLayer(layer)) map.addLayer(layer);
+      if (!visible && map.hasLayer(layer)) map.removeLayer(layer);
+    });
+  }, [filteredIds]);
 
   // Weather fetch — runs when enabled or when the selected day changes
   useEffect(() => {

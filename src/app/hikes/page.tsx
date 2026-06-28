@@ -135,6 +135,17 @@ export default function HikesPage() {
     });
   }, [gpxRoutes, status, difficulty, activityType, search]);
 
+  // IDs to show on the map — undefined means "show all", a Set means "only these"
+  const mapFilteredIds = useMemo(() => {
+    if (!weatherFilter || weatherQualities.size === 0) return undefined;
+    const ids = new Set<string>();
+    weatherQualities.forEach((quality, id) => {
+      if (weatherFilter === "good" && quality === "good") ids.add(id);
+      if (weatherFilter === "good_ok" && (quality === "good" || quality === "ok")) ids.add(id);
+    });
+    return ids;
+  }, [weatherFilter, weatherQualities]);
+
   const gpxCenterMap = useMemo(() => {
     const map = new Map<string, number[]>();
     gpxRoutes.forEach((r) => {
@@ -310,6 +321,7 @@ export default function HikesPage() {
         <OverviewMap
           routes={filteredRoutes}
           onBoundsChange={setMapBounds}
+          filteredIds={mapFilteredIds}
           onWeatherData={(data) => {
             setWeatherQualities(data);
             if (data.size === 0) setWeatherFilter("");
