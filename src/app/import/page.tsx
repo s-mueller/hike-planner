@@ -68,14 +68,25 @@ export default function ImportPage() {
   const [smDone, setSmDone] = useState<SchweizmobilDone | null>(null);
   const [smError, setSmError] = useState<string | null>(null);
 
-  async function handleSchweizmobilImport() {
-    setSmState("importing");
-    setSmError(null);
-    setSmProgress(null);
-    setSmDone(null);
+  const [sgState, setSgState] = useState<SchweizmobilState>("idle");
+  const [sgProgress, setSgProgress] = useState<SchweizmobilProgress | null>(null);
+  const [sgDone, setSgDone] = useState<SchweizmobilDone | null>(null);
+  const [sgError, setSgError] = useState<string | null>(null);
+
+  async function runRouteImport(
+    endpoint: string,
+    setState: (s: SchweizmobilState) => void,
+    setProgress: (p: SchweizmobilProgress | null) => void,
+    setDone: (d: SchweizmobilDone | null) => void,
+    setErr: (e: string | null) => void
+  ) {
+    setState("importing");
+    setErr(null);
+    setProgress(null);
+    setDone(null);
 
     try {
-      const res = await fetch("/api/import/schweizmobil", { method: "POST" });
+      const res = await fetch(endpoint, { method: "POST" });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
@@ -85,6 +96,7 @@ export default function ImportPage() {
 
       const decoder = new TextDecoder();
       let buffer = "";
+      let finished = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -101,20 +113,41 @@ export default function ImportPage() {
           } else if (line.startsWith("data: ")) {
             const data = JSON.parse(line.slice(6));
             if (eventType === "progress") {
-              setSmProgress(data as SchweizmobilProgress);
+              setProgress(data as SchweizmobilProgress);
             } else if (eventType === "done") {
-              setSmDone(data as SchweizmobilDone);
-              setSmState("done");
+              setDone(data as SchweizmobilDone);
+              setState("done");
+              finished = true;
             }
           }
         }
       }
 
-      if (smState !== "done") setSmState("done");
+      if (!finished) setState("done");
     } catch (err) {
-      setSmError(err instanceof Error ? err.message : "Unbekannter Fehler");
-      setSmState("idle");
+      setErr(err instanceof Error ? err.message : "Unbekannter Fehler");
+      setState("idle");
     }
+  }
+
+  function handleSchweizmobilImport() {
+    return runRouteImport(
+      "/api/import/schweizmobil",
+      setSmState,
+      setSmProgress,
+      setSmDone,
+      setSmError
+    );
+  }
+
+  function handleSkitourenguruImport() {
+    return runRouteImport(
+      "/api/import/skitourenguru",
+      setSgState,
+      setSgProgress,
+      setSgDone,
+      setSgError
+    );
   }
 
   async function handlePreview(e: React.FormEvent) {
@@ -434,6 +467,100 @@ export default function ImportPage() {
               setSmState("idle");
               setSmDone(null);
               setSmProgress(null);
+            }}
+            className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
+          >
+            Erneut ausführen
+          </button>
+        </div>
+      )}
+
+      {/* Skitourenguru GPX Import */}
+      <hr className="my-8 border-gray-200" />
+      <h2 className="text-xl font-bold">Skitourenguru-Routen importieren</h2>
+      <p className="text-sm text-gray-500">
+        Touren mit Skitourenguru-Links werden mit Routengeometrie aus dem
+        öffentlichen skitourenguru/Routes-Datensatz ergänzt. Bereits vorhandene
+        GPX-Dateien werden übersprungen. Hinweis: ohne Höhendaten.
+      </p>
+
+      {sgError && (
+        <div className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-700">
+          {sgError}
+        </div>
+      )}
+
+      {sgState === "idle" && (
+        <button
+          onClick={handleSkitourenguruImport}
+          className="rounded bg-orange-600 px-4 py-2 font-medium text-white hover:bg-orange-700"
+        >
+          Skitourenguru-Routen laden
+        </button>
+      )}
+
+      {sgState === "importing" && (
+        <div className="rounded border bg-white p-6 space-y-4">
+          {sgProgress ? (
+            <>
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium text-gray-700">
+                  {sgProgress.current} / {sgProgress.total}
+                </span>
+                <span className="text-gray-500">
+                  {Math.round((sgProgress.current / sgProgress.total) * 100)}%
+                </span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-gray-200">
+                <div
+                  className="h-full rounded-full bg-orange-500 transition-all duration-300"
+                  style={{
+                    width: `${(sgProgress.current / sgProgress.total) * 100}%`,
+                  }}
+                />
+              </div>
+              <p className="text-sm text-gray-600 truncate">
+                {sgProgress.status === "success" && "✓ "}
+                {sgProgress.status === "skipped" && "⏭ "}
+                {sgProgress.status === "error" && "✗ "}
+                {sgProgress.hikeName}
+                {sgProgress.message && (
+                  <span className="text-gray-400"> — {sgProgress.message}</span>
+                )}
+              </p>
+              <div className="flex gap-4 text-xs text-gray-500">
+                <span className="text-green-600">✓ {sgProgress.success}</span>
+                <span>⏭ {sgProgress.skipped}</span>
+                <span className="text-red-600">✗ {sgProgress.errors}</span>
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-gray-500">Verbindung wird aufgebaut…</p>
+          )}
+        </div>
+      )}
+
+      {sgState === "done" && sgDone && (
+        <div className="rounded border bg-white p-6 space-y-4">
+          <h3 className="text-lg font-semibold text-green-700">
+            Skitourenguru-Import abgeschlossen
+          </h3>
+          <div className="flex gap-6 text-sm">
+            <span className="text-green-700 font-medium">
+              ✓ {sgDone.success} erfolgreich
+            </span>
+            <span className="text-gray-500">
+              ⏭ {sgDone.skipped} übersprungen
+            </span>
+            {sgDone.errors > 0 && (
+              <span className="text-red-600">✗ {sgDone.errors} Fehler</span>
+            )}
+          </div>
+          <button
+            onClick={() => {
+              setSgState("idle");
+              setSgDone(null);
+              setSgProgress(null);
             }}
             className="rounded border px-4 py-2 text-sm hover:bg-gray-50"
           >
